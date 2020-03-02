@@ -1,0 +1,1 @@
+make run_vcs BUS=AHB ARCH=IMC IPIC=0
