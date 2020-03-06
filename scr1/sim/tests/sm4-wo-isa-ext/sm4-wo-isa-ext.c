@@ -166,7 +166,7 @@ static unsigned long sm4CalciRK(unsigned long ka)
 static void sm4_setkey(unsigned long SK[32], unsigned char key[16])
 {
 	unsigned long MK[4];
-	unsigned long k[4];
+	unsigned long k[36];
 	unsigned long i = 0;
 
 	GET_ULONG_BE(MK[0], key, 0);
@@ -177,23 +177,10 @@ static void sm4_setkey(unsigned long SK[32], unsigned char key[16])
 	k[1] = MK[1] ^ FK[1];
 	k[2] = MK[2] ^ FK[2];
 	k[3] = MK[3] ^ FK[3];
-
-	__asm__ __volatile__(
-		"mv t0, %[src0]\n\t"
-		"mv t1, %[src1]\n\t"
-		"mv t2, %[src2]\n\t"
-		"mv t3, %[src3]"
-		:
-		: [src0] "r"(k[0]), [src1] "r"(k[1]), [src2] "r"(k[2]), [src3] "r"(k[3])
-		: "t0", "t1", "t2", "t3");
-
-	while (i < 32)
+	for (; i < 32; i++)
 	{
-		__asm__ __volatile__("sm4_key_rf %[dest], %[src]"
-							 : [dest] "=r"(SK[i])
-							 : [src] "r"(CK[i])
-							 : "t0", "t1", "t2", "t3");
-		i++;
+		k[i + 4] = k[i] ^ (sm4CalciRK(k[i + 1] ^ k[i + 2] ^ k[i + 3] ^ CK[i]));
+		SK[i] = k[i + 4];
 	}
 }
 
@@ -206,43 +193,22 @@ static void sm4_one_round(unsigned long sk[32],
 						  unsigned char output[16])
 {
 	unsigned long i = 0;
-	unsigned long ulbuf[4];
+	unsigned long ulbuf[36];
 
 	memset(ulbuf, 0, sizeof(ulbuf));
 	GET_ULONG_BE(ulbuf[0], input, 0)
 	GET_ULONG_BE(ulbuf[1], input, 4)
 	GET_ULONG_BE(ulbuf[2], input, 8)
 	GET_ULONG_BE(ulbuf[3], input, 12)
-
-	__asm__ __volatile__(
-		"mv t0, %[src0]\n\t"
-		"mv t1, %[src1]\n\t"
-		"mv t2, %[src2]\n\t"
-		"mv t3, %[src3]"
-		:
-		: [src0] "r"(ulbuf[0]), [src1] "r"(ulbuf[1]), [src2] "r"(ulbuf[2]), [src3] "r"(ulbuf[3])
-		: "t0", "t1", "t2", "t3");
-
 	while (i < 32)
 	{
-		__asm__ __volatile__("sm4_enc_rf t3, %[src]"
-							 :
-							 : [src] "r"(sk[i])
-							 : "t0", "t1", "t2", "t3");
+		ulbuf[i + 4] = sm4F(ulbuf[i], ulbuf[i + 1], ulbuf[i + 2], ulbuf[i + 3], sk[i]);
 		i++;
 	}
-	__asm__ __volatile__(
-		"mv %[dest0], t0\n\t"
-		"mv %[dest1], t1\n\t"
-		"mv %[dest2], t2\n\t"
-		"mv %[dest3], t3"
-		: [dest0] "=r"(ulbuf[0]), [dest1] "=r"(ulbuf[1]), [dest2] "=r"(ulbuf[2]), [dest3] "=r"(ulbuf[3])
-		:
-		: "t0", "t1", "t2", "t3");
-	PUT_ULONG_BE(ulbuf[3], output, 0);
-	PUT_ULONG_BE(ulbuf[2], output, 4);
-	PUT_ULONG_BE(ulbuf[1], output, 8);
-	PUT_ULONG_BE(ulbuf[0], output, 12);
+	PUT_ULONG_BE(ulbuf[35], output, 0);
+	PUT_ULONG_BE(ulbuf[34], output, 4);
+	PUT_ULONG_BE(ulbuf[33], output, 8);
+	PUT_ULONG_BE(ulbuf[32], output, 12);
 }
 
 /*
@@ -350,7 +316,7 @@ int main(int argc, char **argv)
 						 : [dest] "=r"(cycleEnd));
 	cycleCalculated = cycleEnd - cycleStart;
 	sc_printf("-------------------------------------------------------\n");
-	sc_printf(">>> with ISA extensions, the clock cycle of key expansion algorithm is %d\n", cycleCalculated);
+	sc_printf(">>> without ISA extensions, the clock cycle of key expansion algorithm is %d\n", cycleCalculated);
 	sc_printf("-------------------------------------------------------\n");
 
 	__asm__ __volatile__("csrr %[dest], cycle"
@@ -361,7 +327,7 @@ int main(int argc, char **argv)
 	cycleCalculated = cycleEnd - cycleStart;
 
 	sc_printf("-------------------------------------------------------\n");
-	sc_printf(">>> with ISA extensions, the clock cycle of encryption algorithm is %d\n", cycleCalculated);
+	sc_printf(">>> without ISA extensions, the clock cycle of encryption algorithm is %d\n", cycleCalculated);
 	sc_printf("-------------------------------------------------------\n");
 
 	for (i = 0; i < 16; i++)
@@ -379,7 +345,7 @@ int main(int argc, char **argv)
 	cycleCalculated = cycleEnd - cycleStart;
 
 	sc_printf("-------------------------------------------------------\n");
-	sc_printf(">>> with ISA extensions, the clock cycle of decryption algorithm is %d\n", cycleCalculated);
+	sc_printf(">>> without ISA extensions, the clock cycle of decryption algorithm is %d\n", cycleCalculated);
 	sc_printf("-------------------------------------------------------\n");
 
 	for (i = 0; i < 16; i++)

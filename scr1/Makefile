@@ -99,6 +99,7 @@ TARGETS += dhrystone21
 # comment this target if you don't want to run the hello test
 TARGETS += hello
 TARGETS += sm4-isa-ext
+TARGETS += sm4-wo-isa-ext
 
 # Targets
 .PHONY: tests run_modelsim run_vcs run_ncsim run_verilator run_verilator_wf
@@ -128,8 +129,15 @@ riscv_compliance: | $(bld_dir)
 
 hello: | $(bld_dir)
 	-$(MAKE) -C $(tst_dir)/hello EXT_CFLAGS="$(EXT_CFLAGS)" ARCH=$(ARCH)
+ 
 sm4-isa-ext: | $(bld_dir)
 	-$(MAKE) -C $(tst_dir)/sm4-isa-ext EXT_CFLAGS="$(EXT_CFLAGS)" ARCH=$(ARCH)
+ 
+ 
+sm4-wo-isa-ext: | $(bld_dir)
+	-$(MAKE) -C $(tst_dir)/sm4-wo-isa-ext EXT_CFLAGS="$(EXT_CFLAGS)" ARCH=$(ARCH)
+
+ 
 clean_hex: | $(bld_dir)
 	$(RM) $(bld_dir)/*.hex
 
